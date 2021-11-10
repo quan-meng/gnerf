@@ -1,0 +1,17 @@
+# data
+data: dtu
+img_wh: [ 500, 400 ]
+data_dir: ~
+azim_range: [ 0., 150. ]
+elev_range: [ 0., 80. ]
+radius: [ 4.0, 4.0 ]
+near: 1.5
+far: 8.0
+white_back: False
+ndc: False
+look_at_origin: False
+pose_mode: '6d'
+
+# training
+begin_refine: 12000
+progressive_end: 20000

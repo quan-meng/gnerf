@@ -1,0 +1,25 @@
+generator:
+  type: rmsprop
+  lr: 0.0005
+  lr_anneal: 0.5
+  lr_anneal_every: 8000
+discriminator:
+  type: rmsprop
+  lr: 0.0001
+  lr_anneal: 0.5
+  lr_anneal_every: 8000
+train_pose_params:
+  type: adam
+  lr: 0.005
+  lr_anneal: 0.5
+  lr_anneal_every: 4000
+inv_net:
+  type: adam
+  lr: 0.0001
+  lr_anneal: 0.5
+  lr_anneal_every: 4000
+val_pose_params:
+  type: adam
+  lr: 0.005
+  lr_anneal: 0.5
+  lr_anneal_every: 4000

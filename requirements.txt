@@ -1,0 +1,10 @@
+torch==1.8.0
+vit-pytorch
+future
+git+https://github.com/S-aiueo32/lpips-pytorch.git
+kornia==0.4.1
+tensorboard
+PyYAML
+imageio
+tqdm
+matplotlib

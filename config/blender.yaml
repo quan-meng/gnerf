@@ -1,0 +1,17 @@
+# data
+data: blender
+img_wh: [ 400, 400 ]
+data_dir: ~  # PATH/TO/DATASET
+azim_range: [ 0., 360. ]  # the range of azimuth
+elev_range: [ 0., 90. ]   # the range of elevation
+radius: [ 4.0, 4.0 ]  # the range of radius
+near: 2.0
+far: 6.0
+white_back: True
+ndc: False
+look_at_origin: True
+pose_mode: '3d'
+
+# training
+begin_refine: 12000
+progressive_end: 20000
