@@ -68,8 +68,6 @@ class Trainer(object):
             val_imgs.append(rgb_i)
         val_imgs_raw = torch.cat(val_imgs).to(self.device)  # [N, 3, H, W]
 
-        self.it = 20000 - 1
-
         for self.epoch in itertools.count(self.epoch + 1, 1):
             if self.epoch > self.cfg.num_epoch:
                 break
