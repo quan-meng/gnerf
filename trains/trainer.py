@@ -19,7 +19,7 @@ class Trainer(object):
     def __init__(self, cfg, generator, discriminator, inv_net, train_pose_params, val_pose_params,
                  optim_g, optim_d, optim_i, optim_t, optim_v,
                  scheduler_g, scheduler_d, scheduler_i, scheduler_t, scheduler_v,
-                 train_loader, eval_loader, dynamic_patch_sampler, static_patch_sampler,
+                 train_loader, eval_loader, dynamic_patch_sampler, static_patch_sampler, full_img_sampler,
                  writer, device, it=-1, epoch=-1, psnr_best=-float('inf')):
         self.cfg = cfg
         self.generator = generator
@@ -41,6 +41,7 @@ class Trainer(object):
         self.eval_loader = eval_loader
         self.dynamic_patch_sampler = dynamic_patch_sampler
         self.static_patch_sampler = static_patch_sampler
+        self.full_img_sampler = full_img_sampler
         self.writer = writer
         self.device = device
         self.it = it
@@ -66,6 +67,8 @@ class Trainer(object):
         for rgb_i, _ in self.eval_loader:
             val_imgs.append(rgb_i)
         val_imgs_raw = torch.cat(val_imgs).to(self.device)  # [N, 3, H, W]
+
+        self.it = 20000 - 1
 
         for self.epoch in itertools.count(self.epoch + 1, 1):
             if self.epoch > self.cfg.num_epoch:
@@ -102,9 +105,9 @@ class Trainer(object):
                 self.val_pose_params.train()
 
                 patch_real, coords_real, scales_real = self.dynamic_patch_sampler.image2patch(
-                    img_real, (self.cfg.patch_size, self.cfg.patch_size), self.device)
+                    img_real, self.cfg.patch_size, self.device)
                 coords_fake, scales_fake = self.dynamic_patch_sampler(
-                    nbatch, (self.cfg.patch_size, self.cfg.patch_size), self.device)
+                    nbatch, self.cfg.patch_size, self.device)
                 imgs['Dynamic_patch/real'] = patch_real
 
                 if self.phase == 'A' or self.phase == 'ABAB':
@@ -117,19 +120,16 @@ class Trainer(object):
                     self.discriminator_trainstep(patch_real, patch_fake, scales_real, scales_fake, loss_dict)
 
                     # Train the inversion network
-                    coords_fake, _ = self.static_patch_sampler(nbatch, (self.cfg.inv_size, self.cfg.inv_size),
-                                                               self.device)
+                    coords_fake, _ = self.static_patch_sampler(nbatch, self.cfg.inv_size, self.device)
                     img_fake_fine = self.inversion_net_trainstep(coords_fake, loss_dict)
                     imgs['Static_patch_fake'] = img_fake_fine
 
                     # regularize poses of training images along with the generator
-                    img_real, _, _ = self.static_patch_sampler.image2patch(
-                        img_real, (self.cfg.inv_size, self.cfg.inv_size), self.device)
+                    img_real, _, _ = self.static_patch_sampler.image2patch(img_real, self.cfg.inv_size, self.device)
                     self.training_pose_regularization(img_real, pose_indices, loss_dict)
 
                     # regularize poses of evaluation images
-                    img_real, _, _ = self.static_patch_sampler.image2patch(
-                        val_imgs, (self.cfg.inv_size, self.cfg.inv_size), self.device)
+                    img_real, _, _ = self.static_patch_sampler.image2patch(val_imgs, self.cfg.inv_size, self.device)
                     self.val_pose_regularization(img_real, loss_dict)
 
                 # Refine the camera poses and NeRF
@@ -139,7 +139,7 @@ class Trainer(object):
 
                     if self.it % 8 == 0:
                         img_real, coords_real, _ = self.dynamic_patch_sampler.image2patch(
-                            val_imgs, (self.cfg.patch_size, self.cfg.patch_size), self.device)
+                            val_imgs, self.cfg.patch_size, self.device)
                         self.val_refine_step(img_real, coords_real, loss_dict)
 
                 fps = nbatch / (time.time() - t_it)
@@ -162,7 +162,7 @@ class Trainer(object):
 
                     if ((self.it % self.cfg.sample_every) == 0) or ((self.it <= 500) and (self.it % 100 == 0)):
                         poses_val = self.val_pose_params()
-                        coords_val, _ = self.static_patch_sampler(val_imgs.shape[0], self.img_wh_curr, self.device)
+                        coords_val, _ = self.full_img_sampler(val_imgs.shape[0], self.img_wh_curr, self.device)
                         results = self.generator(coords_val, self.img_wh_curr, poses_val)
 
                         if self.img_wh_end[0] > self.img_wh_curr[0] or self.img_wh_end[1] > self.img_wh_curr[1]:
@@ -198,7 +198,8 @@ class Trainer(object):
                         self.writer.add_scalar('lr/inversion_net', self.optim_i.param_groups[0]['lr'], self.it)
                         self.writer.add_scalar('lr/poses_training', self.optim_t.param_groups[0]['lr'], self.it)
                         self.writer.add_scalar('lr/poses_val', self.optim_v.param_groups[0]['lr'], self.it)
-                        self.writer.add_scalar('img_w_curr', self.img_wh_curr[0], self.it)
+                        self.writer.add_scalar('img_wh_curr/w', self.img_wh_curr[0], self.it)
+                        self.writer.add_scalar('img_wh_curr/h', self.img_wh_curr[1], self.it)
                         self.writer.add_scalar('noise_std', self.generator.noise_std, self.it)
                         self.writer.add_scalar('Training/psnr_best', self.psnr_best, self.it)
 
@@ -502,7 +503,7 @@ class Trainer(object):
 
     def make_video(self, nframes=40):
         chunk = self.batch_size
-        coords, _ = self.static_patch_sampler(chunk, self.img_wh_curr, self.device)
+        coords, _ = self.full_img_sampler(chunk, self.img_wh_curr, self.device)
         poses = self.generator.ray_sampler.spheric_poses(nframes).to(self.device)
         rescale_func = Resize((self.img_wh_end[1], self.img_wh_end[0]))
 

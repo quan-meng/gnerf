@@ -4,15 +4,38 @@ from math import exp
 
 
 class PatchSampler(object):
+    def __init__(self):
+        self.full_indices = None
+
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
 
     def image2patch(self, imgs, wh, device):
         nbatch = imgs.shape[0]
         patch_coord, scale = self(nbatch, wh, device)
-        imgs = F.grid_sample(imgs, patch_coord, mode='bilinear', align_corners=True)
+
+        if not self.full_indices:
+            imgs = F.grid_sample(imgs, patch_coord, mode='bilinear', align_corners=True)
 
         return imgs, patch_coord, scale
+
+
+class FullImageSampler(PatchSampler):
+    def __init__(self):
+        super(FullImageSampler, self).__init__()
+
+        self.full_indices = True
+
+    def __call__(self, nbatch, wh, device):
+        w, h = torch.meshgrid([torch.linspace(-1, 1, wh[1]), torch.linspace(-1, 1, wh[0])])
+        h = h[None, ..., None]
+        w = w[None, ..., None]
+
+        coords = torch.cat([h, w], dim=-1)  # [1, H, W, 2]
+
+        coords = coords.repeat(nbatch, 1, 1, 1).to(device)
+        scales = torch.ones((nbatch, 1, 1, 1), device=device)
+        return coords.contiguous(), scales.contiguous()
 
 
 class RescalePatchSampler(PatchSampler):
@@ -20,8 +43,10 @@ class RescalePatchSampler(PatchSampler):
         super(RescalePatchSampler, self).__init__()
         self.scale = scale
 
-    def __call__(self, nbatch, wh, device):
-        w, h = torch.meshgrid([torch.linspace(-1, 1, wh[0]), torch.linspace(-1, 1, wh[1])])
+        self.full_indices = False
+
+    def __call__(self, nbatch, patch_size, device):
+        w, h = torch.meshgrid([torch.linspace(-1, 1, patch_size), torch.linspace(-1, 1, patch_size)])
         h = h[None, ..., None]
         w = w[None, ..., None]
 
@@ -48,9 +73,11 @@ class FlexPatchSampler(PatchSampler):
         self.iterations = 0
         self.scale_anneal = scale_anneal
 
-    def __call__(self, nbatch, wh, device):
-        w, h = torch.meshgrid([torch.linspace(-1, 1, wh[0], device=device),
-                               torch.linspace(-1, 1, wh[1], device=device)])
+        self.full_indices = False
+
+    def __call__(self, nbatch, patch_size, device):
+        w, h = torch.meshgrid([torch.linspace(-1, 1, patch_size, device=device),
+                               torch.linspace(-1, 1, patch_size, device=device)])
         h = h[None, ..., None]
         w = w[None, ..., None]
 

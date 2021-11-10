@@ -10,7 +10,7 @@ from config import config
 from model import *
 from trains.trainer import Trainer
 from dataset.dataloader import create_dataloader
-from tools.patch_sampler import RescalePatchSampler, FlexPatchSampler
+from tools.patch_sampler import RescalePatchSampler, FlexPatchSampler, FullImageSampler
 from tools.ray_sampler import RaySampler
 from tools.utils import count_trainable_parameters
 
@@ -93,6 +93,8 @@ if __name__ == '__main__':
 
     static_patch_sampler = RescalePatchSampler()
 
+    full_img_sampler = FullImageSampler()
+
     ray_sampler = RaySampler(near=args.near, far=args.far, azim_range=args.azim_range, elev_range=args.elev_range,
                              radius=args.radius, look_at_origin=args.look_at_origin, ndc=args.ndc,
                              intrinsics=train_loader.dataset.intrinsics.clone().detach().to(device))
@@ -165,6 +167,6 @@ if __name__ == '__main__':
     trainer = Trainer(args, generator, discriminator, inv_net, train_pose_params, val_pose_params,
                       optim_g, optim_d, optim_i, optim_t, optim_v,
                       scheduler_g, scheduler_d, scheduler_i, scheduler_t, scheduler_v,
-                      train_loader, eval_loader, dynamic_patch_sampler, static_patch_sampler,
+                      train_loader, eval_loader, dynamic_patch_sampler, static_patch_sampler, full_img_sampler,
                       writer, device, it=args.it, epoch=args.epoch, psnr_best=args.psnr_best)
     trainer.train()
