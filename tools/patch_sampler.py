@@ -69,6 +69,7 @@ class FlexPatchSampler(PatchSampler):
 
         self.min_scale = min_scale
         self.max_scale = max_scale
+        self.scales_curr = (min_scale, max_scale)
 
         self.iterations = 0
         self.scale_anneal = scale_anneal
@@ -88,6 +89,8 @@ class FlexPatchSampler(PatchSampler):
             min_scale = self.min_scale
 
         max_scale = self.max_scale
+
+        self.scales_curr = (min_scale, max_scale)
 
         if self.random_scale:
             scales = torch.rand((nbatch, 1, 1, 1), device=device) * (max_scale - min_scale) + min_scale

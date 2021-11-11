@@ -76,16 +76,16 @@ class Trainer(object):
                 t_it = time.time()
                 self.it += 1
 
+                loss_dict, metrics, imgs = {}, {}, {}
+                nbatch = img_real.shape[0]
+                img_real = img_real.to(self.device)
+
                 if self.it <= self.cfg.begin_refine:
                     self.phase = 'A'
                 elif self.cfg.begin_refine < self.it <= self.cfg.progressive_end:
                     self.phase = 'ABAB'
                 else:
                     self.phase = 'B'
-
-                loss_dict, metrics, imgs = {}, {}, {}
-                nbatch = img_real.shape[0]
-                img_real = img_real.to(self.device)
 
                 if self.cfg.progressvie_training:
                     img_real = self.progressvie_training(img_real)
@@ -95,6 +95,8 @@ class Trainer(object):
 
                 if self.cfg.decrease_noise:
                     self.generator.decrease_noise(self.it)
+
+                self.dynamic_patch_sampler.iterations = self.it
 
                 self.generator.train()
                 self.discriminator.train()
@@ -142,6 +144,9 @@ class Trainer(object):
 
                 fps = nbatch / (time.time() - t_it)
 
+                for k, v in loss_dict.items():
+                    self.writer.add_scalar(f'Training/{k}', v, self.it)
+
                 # Update learning rate
                 self.scheduler_g.step()
                 self.scheduler_d.step()
@@ -168,6 +173,10 @@ class Trainer(object):
                             results = {k: rescale_func(v) for k, v in results.items()}
 
                         for k, v in results.items():
+                            if k == 'depth':
+                                v = (v + 1.0) / 2.0
+                                v = (v - v.min()) / (v.max() - v.min() + 1e-8)
+                                v = v * 2.0 - 1.0
                             v = utils.make_grid(v[:4], nrow=4,
                                                 normalize=True,
                                                 value_range=(-1, 1))
@@ -185,9 +194,6 @@ class Trainer(object):
                             lpips_.append(lpips(rgb_pred, rgb_gt, device=self.device))
                         metrics['lpips'] = sum(lpips_) / len(lpips_)
 
-                        for k, v in loss_dict.items():
-                            self.writer.add_scalar(f'Training/{k}', v, self.it)
-
                         for k, v in metrics.items():
                             self.writer.add_scalar(f'Val/{k}', v, self.it)
 
@@ -198,8 +204,12 @@ class Trainer(object):
                         self.writer.add_scalar('lr/poses_val', self.optim_v.param_groups[0]['lr'], self.it)
                         self.writer.add_scalar('img_wh_curr/w', self.img_wh_curr[0], self.it)
                         self.writer.add_scalar('img_wh_curr/h', self.img_wh_curr[1], self.it)
+                        self.writer.add_scalar(
+                            'scales_curr/min_scale', self.dynamic_patch_sampler.scales_curr[0], self.it)
+                        self.writer.add_scalar(
+                            'scales_curr/max_scale', self.dynamic_patch_sampler.scales_curr[1], self.it)
                         self.writer.add_scalar('noise_std', self.generator.noise_std, self.it)
-                        self.writer.add_scalar('Training/psnr_best', self.psnr_best, self.it)
+                        self.writer.add_scalar('Val/psnr_best', self.psnr_best, self.it)
 
                         for k, v in imgs.items():
                             v = utils.make_grid(v, nrow=v.shape[0] // int(v.size(0) ** 0.5),
