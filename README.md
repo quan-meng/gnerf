@@ -63,8 +63,7 @@ where you replace CONFIG.yaml with your config file (blender.yaml for blender da
 can optionally monitor on the training process using tensorboard by adding `--open_tensorboard` argument. The default
 setting takes around 13GB GPU memory. After 40k iterations, you should get a video like these:
 
-<img src="./images/hotdog.gif" width="256" height="256"/>
-<img src="./images/dtu_scan4.gif" width="320" height="256"/>
+<img src="./images/hotdog.gif" width="256" height="256"/><img src="./images/dtu_scan4.gif" width="320" height="256"/>
 
 ## Evaluation
 
